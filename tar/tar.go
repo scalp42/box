@@ -181,6 +181,73 @@ func processEntries(entries []string) ([]lstatInfo, error) {
 	return lstatEntries, nil
 }
 
+// Unarchive takes a destination directory and tar filename; it returns an
+// error if the unarchive failed.  It unpacks a tar archive into the
+// destination directory.
+func Unarchive(path, tarFile string) error {
+	tf, err := os.Open(tarFile)
+	if err != nil {
+		return err
+	}
+	defer tf.Close()
+
+	tr := tar.NewReader(tf)
+	path = filepath.Clean(path)
+
+	for {
+		header, err := tr.Next()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return err
+		}
+
+		if strings.HasPrefix(header.Name, "/") {
+			header.Name = header.Name[1:]
+		}
+
+		rel, err := filepath.Rel(path, filepath.Clean(filepath.Join(path, header.Name)))
+		if err != nil {
+			return err
+		}
+
+		rel = filepath.Join(path, rel)
+
+		if path == rel {
+			continue
+		}
+
+		if strings.HasPrefix(rel, "..") {
+			return fmt.Errorf("Path %q lies underneath temporary directory %q", header.Name, path)
+		}
+
+		if header.FileInfo().IsDir() {
+			if err := os.MkdirAll(rel, header.FileInfo().Mode()); err != nil {
+				return err
+			}
+		} else {
+			f, err := os.OpenFile(rel, os.O_CREATE|os.O_WRONLY, header.FileInfo().Mode())
+			if err != nil {
+				f.Close()
+				return err
+			}
+
+			if _, err := io.Copy(f, tr); err != nil {
+				f.Close()
+				return err
+			}
+
+			f.Close()
+		}
+
+		if err := os.Chown(rel, header.Uid, header.Gid); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Archive takes a source and target directory and returns a filename and/or
 // error. The source will be archived relative to the target. The file will
 // live in the user's os.TempDir().

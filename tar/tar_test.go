@@ -24,6 +24,25 @@ func TestTar(t *T) {
 	TestingT(t)
 }
 
+func (ts *tarSuite) TestUnarchive(c *C) {
+	tarball, sum, err := Archive(".", "/")
+	c.Assert(err, IsNil)
+	c.Assert(sum, Not(Equals), "")
+	c.Assert(tarball, Not(Equals), "")
+	defer os.Remove(tarball)
+
+	tmp, err := ioutil.TempDir("", "unarchive-test")
+	c.Assert(err, IsNil)
+	defer os.RemoveAll(tmp)
+
+	c.Assert(Unarchive(tmp, tarball), IsNil)
+
+	_, err = os.Stat(filepath.Join(tmp, "tar.go"))
+	c.Assert(err, IsNil)
+	_, err = os.Stat(filepath.Join(tmp, "tar_test.go"))
+	c.Assert(err, IsNil)
+}
+
 func (ts *tarSuite) TestArchive(c *C) {
 	tarball, sum, err := Archive(context.Background(), ".", "/", []string{})
 	c.Assert(err, IsNil)
