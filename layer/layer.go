@@ -87,11 +87,11 @@ func (l *Layer) Remove() error {
 
 // Exists returns true if a layer exists, and false if not.
 func (l *Layer) Exists() bool {
-	fi, _ := os.Stat(l.Path())
-	return fi != nil
+	_, err := os.Stat(l.Path())
+	return !os.IsNotExist(err)
 }
 
-// Archive foo
+// Archive archives a dir at dirname and tars it to the root of the tree.
 func (l *Layer) Archive() (string, string, error) {
 	return tar.Archive(context.Background(), l.dirname, "/", []string{})
 }
